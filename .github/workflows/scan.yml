@@ -1,0 +1,69 @@
+name: JobPilot - LinkedIn Job Scanner
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # every hour
+  workflow_dispatch:
+    inputs:
+      linkedin_url:
+        description: 'LinkedIn profile URL'
+        required: false
+        default: ''
+      cv_text:
+        description: 'CV text (base64 or plain)'
+        required: false
+        default: ''
+      job_titles:
+        description: 'Job titles (comma-separated)'
+        required: false
+        default: ''
+      locations:
+        description: 'Locations (comma-separated)'
+        required: false
+        default: 'Ireland'
+      user_email:
+        description: 'Email to send alerts to'
+        required: false
+        default: ''
+
+jobs:
+  scan-jobs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests beautifulsoup4 openai
+
+      - name: Restore seen jobs cache
+        uses: actions/cache@v4
+        with:
+          path: seen_jobs.json
+          key: seen-jobs-${{ runner.os }}
+          restore-keys: seen-jobs-
+
+      - name: Run LinkedIn Job Scanner
+        env:
+          SENDER_EMAIL:    ${{ secrets.SENDER_EMAIL }}
+          SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
+          RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+          OPENAI_API_KEY:  ${{ secrets.OPENAI_API_KEY }}
+          USER_LINKEDIN_URL: ${{ github.event.inputs.linkedin_url }}
+          USER_CV_TEXT:      ${{ github.event.inputs.cv_text }}
+          USER_JOB_TITLES:   ${{ github.event.inputs.job_titles }}
+          USER_LOCATIONS:    ${{ github.event.inputs.locations }}
+          USER_EMAIL:        ${{ github.event.inputs.user_email }}
+        run: python -u job_scanner.py
+
+      - name: Save seen jobs cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: seen_jobs.json
+          key: seen-jobs-${{ runner.os }}
